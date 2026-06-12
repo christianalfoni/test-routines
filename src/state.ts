@@ -1,14 +1,20 @@
 import { reactive } from 'reactx'
+import { browserServices } from './services'
+import type { Services } from './services'
 
 const COUNT_KEY = 'app_count'
 
 class AppState {
-  count = Number(localStorage.getItem(COUNT_KEY) ?? 0)
+  count: number
+
+  constructor(private services: Services) {
+    this.count = services.persistence.get<number>(COUNT_KEY) ?? 0
+  }
 
   increment() {
     this.count++
-    localStorage.setItem(COUNT_KEY, String(this.count))
+    this.services.persistence.set(COUNT_KEY, this.count)
   }
 }
 
-export const appState = reactive(new AppState())
+export const appState = reactive(new AppState(browserServices))
