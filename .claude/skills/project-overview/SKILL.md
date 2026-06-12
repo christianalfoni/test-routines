@@ -18,6 +18,7 @@ A web app scaffolded with **Vite + React + TypeScript** (Vite's `react-ts` templ
 - `src/main.tsx` — entry, mounts `<App />`
 - `src/App.tsx` — root component; `src/App.css`, `src/index.css` — styles
 - `src/state.ts` — app-level reactive state (reactx `reactive()` class instance)
+- `src/services.ts` — service layer (persistence, etc.) injected into `AppState`; exports `browserServices` and `Services` type
 - `src/assets/` — static imports
 - `index.html` — Vite HTML entry
 - `vite.config.ts`, `tsconfig*.json` (`tsconfig.app.json` for app code, `tsconfig.node.json` for config files)
@@ -32,3 +33,4 @@ A web app scaffolded with **Vite + React + TypeScript** (Vite's `react-ts` templ
 
 ## Gotchas
 - `npm create vite@latest .` aborts ("Operation cancelled") when the directory is non-empty (e.g. existing `.git`/`.claude`). Scaffold into a temp subdir, then move files (including dotfiles like `.gitignore`) into the root. The package `name` will inherit the temp dir name — fix it in `package.json`.
+- In fresh remote sessions `node_modules` is absent — run `npm install` before `npm run build` or `npm run dev`, or builds will fail with "Cannot find type definition file" errors.
