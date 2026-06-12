@@ -16,12 +16,20 @@ implement, open PR) → Auto-fix takes over the PR.
 
 ## What the workflow does (single `actions/github-script@v7` step)
 
-- **Event:** `issue_comment: [created]` only. Job-level `if` drops PR comments
-  (`github.event.issue.pull_request == null`) and Bot comments (`...user.type != 'Bot'` —
-  stops the dispatcher's own `github-actions[bot]` ack from re-triggering it).
-- **Command match:** coarse `contains(body, '@claude')` in the `if:` as a cheap pre-filter,
-  then the authoritative `/@claude\b/` test in the step — `@claude` can appear anywhere
-  in the comment body (mention style, not a slash-command).
+- **Events:** two triggers:
+  - `issue_comment: [created]` — fires when `@claude` appears in a comment on an issue.
+    Job-level `if` drops PR comments (`github.event.issue.pull_request == null`) and Bot
+    comments (`...user.type != 'Bot'` — stops the dispatcher's own `github-actions[bot]`
+    ack from re-triggering it).
+  - `issues: [opened]` — fires when `@claude` appears in the original issue body. Uses
+    `github.event.issue.author_association` for the write gate (no bot-type check needed —
+    bots won't hold OWNER/MEMBER/COLLABORATOR). The dedupe marker is keyed to
+    `issue-<number>` (not a numeric comment id) so it never collides.
+- **Command match:** coarse `contains(body, '@claude')` in the job-level `if:` as a cheap
+  pre-filter, then the authoritative `/@claude\b/` test in the step — `@claude` can appear
+  anywhere in the body (mention style, not a slash-command).
+- **Context label:** the fire payload uses `Comment URL:` for `issue_comment` events and
+  `Issue URL:` for `issues` events; both point to the triggering URL.
 - **Write gate (fails closed):** `author_association` ∈ {OWNER, MEMBER, COLLABORATOR}, in
   the job `if:`. There is deliberately **no `always()` step** — every post-gate action sits
   on default `success()`, so a short-circuited gate can never fire the routine.
@@ -69,6 +77,31 @@ The async wrapper matters — github-script runs the body in an async fn, so top
 `await` is valid there but `node --check` rejects it unwrapped. This only proves YAML+JS
 syntax; true end-to-end validation needs the secrets, the routine, and a real issue comment
 (can't be done locally).
+
+## Routine behaviour (what the routine prompt must say)
+
+The routine must NOT post a summary comment on the issue after opening the PR. The PR body
+must include a closing reference (`Closes #N` or `Fixes #N`) so GitHub auto-links the issue.
+The ack comment posted by the dispatcher (`🤖 On it…`) is sufficient — no follow-up comment
+on the issue is needed.
+
+Current expected routine prompt (paste into the web UI):
+
+```
+You are an autonomous coding agent, fired from a "@claude" mention on a GitHub issue or in
+the original issue body. The run input gives you the repo, the issue number, the source URL,
+and the request text.
+
+1. Read the full issue thread with your GitHub tools.
+2. Determine what is being asked. If it is unclear, ambiguous, or risky, post a comment
+   asking for clarification instead of guessing.
+3. Implement the change, run the tests, and open a PR whose body includes "Closes #N"
+   referencing the issue. Never write the literal string "@claude" in any comment you post —
+   it would re-trigger the dispatcher.
+
+Once the PR is open you don't need to be re-triggered for follow-ups: Auto-fix watches the
+PR and handles CI failures and review comments automatically.
+```
 
 ## Manual web-UI setup this depends on
 

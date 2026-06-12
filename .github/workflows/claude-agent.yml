@@ -1,6 +1,9 @@
 name: Claude Agent Dispatcher
 
-# Kicks off a cloud Claude Code routine when a writer comments "@claude ..." on an ISSUE.
+# Kicks off a cloud Claude Code routine when a writer mentions "@claude" on an ISSUE.
+# Triggers on two events:
+#   1. issue_comment (created): "@claude ..." anywhere in a comment body.
+#   2. issues (opened): "@claude ..." anywhere in the original issue body.
 # This workflow does ZERO Claude work: it gates, sanitises, fires the routine, and acks.
 # The PR lifecycle that follows (CI failures, review comments) is owned by the routine's
 # Auto-fix behaviour — this dispatcher does NOT listen for PR events.
@@ -8,6 +11,8 @@ name: Claude Agent Dispatcher
 on:
   issue_comment:
     types: [created]
+  issues:
+    types: [opened]
 
 permissions:
   issues: write
@@ -17,15 +22,24 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     # Cheap pre-filters. The write-access gate here fails closed: if author_association is
-    # not a trusted role, the job never runs. Skip PR comments (Auto-fix's job) and Bot
-    # comments (our own ack is posted as github-actions[bot] and must not re-trigger us).
+    # not a trusted role, the job never runs.
+    # issue_comment: Skip PR comments (Auto-fix's job) and Bot comments (our own ack is
+    #   posted as github-actions[bot] and must not re-trigger us).
+    # issues (opened): Fires when the issue body mentions @claude and the opener has write
+    #   access. No bot-type check needed — bots won't have OWNER/MEMBER/COLLABORATOR.
     if: >-
       github.event.issue.pull_request == null &&
-      github.event.comment.user.type != 'Bot' &&
-      contains(github.event.comment.body, '@claude') &&
-      (github.event.comment.author_association == 'OWNER' ||
-       github.event.comment.author_association == 'MEMBER' ||
-       github.event.comment.author_association == 'COLLABORATOR')
+      ((github.event_name == 'issue_comment' &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(github.event.comment.body, '@claude') &&
+        (github.event.comment.author_association == 'OWNER' ||
+         github.event.comment.author_association == 'MEMBER' ||
+         github.event.comment.author_association == 'COLLABORATOR')) ||
+       (github.event_name == 'issues' &&
+        contains(github.event.issue.body, '@claude') &&
+        (github.event.issue.author_association == 'OWNER' ||
+         github.event.issue.author_association == 'MEMBER' ||
+         github.event.issue.author_association == 'COLLABORATOR')))
     steps:
       # A single github-script step. It runs on default success() — there is deliberately
       # no always() step, so a failed/short-circuited gate can never fire the routine.
@@ -38,35 +52,46 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const issueNumber = context.payload.issue.number;
-            const comment = context.payload.comment;
-            const commentId = comment.id;
-            const commentUrl = comment.html_url;
-            const body = comment.body || '';
 
-            // "@claude" can appear anywhere in the comment body (mention style).
+            // Normalise across event types: issue_comment uses the comment object;
+            // issues (opened) uses the issue body itself.
+            let body, eventId, eventUrl;
+            if (context.eventName === 'issues') {
+              const issue = context.payload.issue;
+              body = issue.body || '';
+              eventId = `issue-${issue.number}`;   // synthetic, distinct from numeric comment ids
+              eventUrl = issue.html_url;
+            } else {
+              const comment = context.payload.comment;
+              body = comment.body || '';
+              eventId = comment.id;
+              eventUrl = comment.html_url;
+            }
+
+            // "@claude" can appear anywhere in the body (mention style).
             if (!/@claude\b/.test(body)) {
-              core.info('No @claude mention in comment; skipping.');
+              core.info('No @claude mention; skipping.');
               return;
             }
 
-            // Sanitise the comment body before forwarding — it is a prompt-injection surface.
+            // Sanitise the body before forwarding — it is a prompt-injection surface.
             // Strip HTML comments, then zero-width characters.
             const sanitised = body
               .replace(/<!--[\s\S]*?-->/g, '')
               .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
               .trim();
 
-            // Hidden marker keyed to THIS comment's id. The success ack carries it so a
-            // workflow re-run for the same comment is detected and skipped — the /fire
+            // Hidden marker keyed to THIS event's id. The success ack carries it so a
+            // workflow re-run for the same event is detected and skipped — the /fire
             // endpoint has no idempotency key, so a retry would otherwise burn a daily run.
-            const marker = `<!-- claude-dispatch:${commentId} -->`;
+            const marker = `<!-- claude-dispatch:${eventId} -->`;
 
             // Dedupe: scan the issue's comments for a prior "🤖 On it" ack with our marker.
             const existing = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: issueNumber, per_page: 100,
             });
             if (existing.some((c) => (c.body || '').includes(marker))) {
-              core.info('Ack for this comment already present; skipping to avoid a duplicate run.');
+              core.info('Ack for this event already present; skipping to avoid a duplicate run.');
               return;
             }
 
@@ -77,13 +102,14 @@ jobs:
               return;
             }
 
-            // Context only — repo, issue, comment link, and the sanitised request. No
+            // Context only — repo, issue, source link, and the sanitised request. No
             // behaviour/instructions: the routine's saved prompt owns behaviour, and this
             // text is appended to it verbatim (freeform, not parsed).
+            const urlLabel = context.eventName === 'issues' ? 'Issue URL' : 'Comment URL';
             const text = [
               `Repository: ${owner}/${repo}`,
               `Issue: #${issueNumber}`,
-              `Comment URL: ${commentUrl}`,
+              `${urlLabel}: ${eventUrl}`,
               ``,
               `Request:`,
               sanitised,
