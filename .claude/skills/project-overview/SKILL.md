@@ -10,12 +10,14 @@ A web app scaffolded with **Vite + React + TypeScript** (Vite's `react-ts` templ
 - React 19 + react-dom 19
 - TypeScript ~6.0
 - Vite 8 with `@vitejs/plugin-react`
+- **reactx ^1.0.0** — transparent reactive state management (see `reactx-docs` skill)
 - ESLint 10 (flat config in `eslint.config.js`), typescript-eslint
 - Node 24, npm 11. Shell is **zsh** (no `shopt` — use `setopt`/zsh globbing or explicit moves).
 
 ## Layout
 - `src/main.tsx` — entry, mounts `<App />`
 - `src/App.tsx` — root component; `src/App.css`, `src/index.css` — styles
+- `src/state.ts` — app-level reactive state (reactx `reactive()` class instance)
 - `src/assets/` — static imports
 - `index.html` — Vite HTML entry
 - `vite.config.ts`, `tsconfig*.json` (`tsconfig.app.json` for app code, `tsconfig.node.json` for config files)
