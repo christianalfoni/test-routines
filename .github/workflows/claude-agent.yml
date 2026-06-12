@@ -1,0 +1,143 @@
+name: Claude Agent Dispatcher
+
+# Kicks off a cloud Claude Code routine when a writer comments "/claude ..." on an ISSUE.
+# This workflow does ZERO Claude work: it gates, sanitises, fires the routine, and acks.
+# The PR lifecycle that follows (CI failures, review comments) is owned by the routine's
+# Auto-fix behaviour — this dispatcher does NOT listen for PR events.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    # Cheap pre-filters. The write-access gate here fails closed: if author_association is
+    # not a trusted role, the job never runs. Skip PR comments (Auto-fix's job) and Bot
+    # comments (our own ack is posted as github-actions[bot] and must not re-trigger us).
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(github.event.comment.body, '/claude') &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    steps:
+      # A single github-script step. It runs on default success() — there is deliberately
+      # no always() step, so a failed/short-circuited gate can never fire the routine.
+      - name: Gate, sanitise, fire, ack
+        uses: actions/github-script@v7
+        env:
+          FIRE_URL: ${{ secrets.CLAUDE_ROUTINE_FIRE_URL }}
+          ROUTINE_TOKEN: ${{ secrets.CLAUDE_ROUTINE_TOKEN }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issueNumber = context.payload.issue.number;
+            const comment = context.payload.comment;
+            const commentId = comment.id;
+            const commentUrl = comment.html_url;
+            const body = comment.body || '';
+
+            // Treat "/claude" as a COMMAND at the start of the comment, not a substring.
+            // A quoted or summarised "/claude" mid-text must not fire the agent.
+            if (!/^\s*\/claude\b/.test(body)) {
+              core.info('No /claude command at start of comment; skipping.');
+              return;
+            }
+
+            // Sanitise the comment body before forwarding — it is a prompt-injection surface.
+            // Strip HTML comments, then zero-width characters.
+            const sanitised = body
+              .replace(/<!--[\s\S]*?-->/g, '')
+              .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+              .trim();
+
+            // Hidden marker keyed to THIS comment's id. The success ack carries it so a
+            // workflow re-run for the same comment is detected and skipped — the /fire
+            // endpoint has no idempotency key, so a retry would otherwise burn a daily run.
+            const marker = `<!-- claude-dispatch:${commentId} -->`;
+
+            // Dedupe: scan the issue's comments for a prior "🤖 On it" ack with our marker.
+            const existing = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: issueNumber, per_page: 100,
+            });
+            if (existing.some((c) => (c.body || '').includes(marker))) {
+              core.info('Ack for this comment already present; skipping to avoid a duplicate run.');
+              return;
+            }
+
+            const fireUrl = process.env.FIRE_URL;
+            const token = process.env.ROUTINE_TOKEN;
+            if (!fireUrl || !token) {
+              core.setFailed('CLAUDE_ROUTINE_FIRE_URL or CLAUDE_ROUTINE_TOKEN is not set.');
+              return;
+            }
+
+            // Context only — repo, issue, comment link, and the sanitised request. No
+            // behaviour/instructions: the routine's saved prompt owns behaviour, and this
+            // text is appended to it verbatim (freeform, not parsed).
+            const text = [
+              `Repository: ${owner}/${repo}`,
+              `Issue: #${issueNumber}`,
+              `Comment URL: ${commentUrl}`,
+              ``,
+              `Request:`,
+              sanitised,
+            ].join('\n');
+
+            const postComment = (commentBody) =>
+              github.rest.issues.createComment({
+                owner, repo, issue_number: issueNumber, body: commentBody,
+              });
+
+            let res, payload;
+            try {
+              res = await fetch(fireUrl, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'anthropic-beta': 'experimental-cc-routine-2026-04-01',
+                  'anthropic-version': '2023-06-01',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text }),
+              });
+            } catch (err) {
+              await postComment(`🤖 Couldn't start the agent — network error reaching the routine: ${err.message}`);
+              core.setFailed(`Fire request failed: ${err.message}`);
+              return;
+            }
+
+            const raw = await res.text();
+            try { payload = JSON.parse(raw); } catch { payload = null; }
+
+            if (res.status === 200 && payload && payload.claude_code_session_url) {
+              await postComment(`${marker}\n🤖 On it — watch live: ${payload.claude_code_session_url}`);
+              core.info(`Routine fired: ${payload.claude_code_session_url}`);
+              return;
+            }
+
+            // Non-200: surface why in a comment instead of failing silently in the log.
+            const reasons = {
+              400: 'the request was rejected (the routine may be paused, or the request was malformed)',
+              401: 'the routine token is missing or invalid',
+              403: 'this account/organization does not have access to the routine API',
+              404: 'the routine could not be found',
+              429: 'the daily routine-run or usage limit has been reached',
+              500: 'the routine service hit an unexpected error',
+              503: 'the routine service is temporarily overloaded',
+            };
+            const apiMessage = payload && payload.error && payload.error.message;
+            let reason = reasons[res.status] || `the routine service returned HTTP ${res.status}`;
+            if (res.status === 429) {
+              const retryAfter = res.headers.get('retry-after');
+              if (retryAfter) reason += ` (retry after ${retryAfter}s)`;
+            }
+            if (apiMessage) reason += ` — ${apiMessage}`;
+            await postComment(`🤖 Couldn't start the agent: ${reason}.`);
+            core.setFailed(`Routine fire returned HTTP ${res.status}: ${reason}`);
