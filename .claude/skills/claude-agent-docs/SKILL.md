@@ -1,10 +1,10 @@
 ---
 name: claude-agent-docs
-description: Knowledge about this repo's "/claude" GitHub coding agent — the dispatcher workflow and the Claude Code routine-fire API. Load before editing .github/workflows/claude-agent.yml or touching the routine wiring.
+description: Knowledge about this repo's "@claude" GitHub coding agent — the dispatcher workflow and the Claude Code routine-fire API. Load before editing .github/workflows/claude-agent.yml or touching the routine wiring.
 ---
 # Claude agent (mention-driven coding agent)
 
-This repo has a "/claude" agent: an issue comment `/claude ...` kicks off a cloud
+This repo has an "@claude" agent: an issue comment `@claude ...` kicks off a cloud
 Claude Code **routine** that implements the request and opens a PR; the routine's
 **Auto-fix** then owns that PR's lifecycle (CI + review comments). A small GitHub
 Actions **dispatcher** exists only to bridge issue-comment events to the routine,
