@@ -51,6 +51,7 @@ description: Knowledge about <domain>. Load before assuming how <domain> works o
 - A single fact can stay inline in the SKILL.md; split into docs + a TOC once it grows past a few. (`project-overview` usually starts inline and grows a TOC as the project does.)
 - Update an existing doc or row rather than duplicating.
 - Keep `project-overview` current: whenever the structure, dependencies, or purpose differ from what it says, fix it — the gap healing itself.
+- **Track docs you discovered but didn't read.** If you found links to documentation (README sections, doc pages, patterns, guides) that you didn't fetch or apply this session, add them as stub rows in the TOC with their URL and a one-line description. A future run should be able to pick them up without re-discovering them. Example: `| patterns.md | https://… | composing state, services, invariants, subscriptions — unread |`
 
 ## 2. Validation-tool skill — proof from the user's side
 
