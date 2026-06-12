@@ -20,8 +20,8 @@ implement, open PR) → Auto-fix takes over the PR.
   (`github.event.issue.pull_request == null`) and Bot comments (`...user.type != 'Bot'` —
   stops the dispatcher's own `github-actions[bot]` ack from re-triggering it).
 - **Command match:** coarse `contains(body, '@claude')` in the `if:` as a cheap pre-filter,
-  then the authoritative `/^\s*@claude\b/` test in the step — so a quoted/summarised
-  `@claude` mid-text can't fire it.
+  then the authoritative `/@claude\b/` test in the step — `@claude` can appear anywhere
+  in the comment body (mention style, not a slash-command).
 - **Write gate (fails closed):** `author_association` ∈ {OWNER, MEMBER, COLLABORATOR}, in
   the job `if:`. There is deliberately **no `always()` step** — every post-gate action sits
   on default `success()`, so a short-circuited gate can never fire the routine.

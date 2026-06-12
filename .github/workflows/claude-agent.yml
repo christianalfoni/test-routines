@@ -43,10 +43,9 @@ jobs:
             const commentUrl = comment.html_url;
             const body = comment.body || '';
 
-            // Treat "@claude" as a COMMAND at the start of the comment, not a substring.
-            // A quoted or summarised "@claude" mid-text must not fire the agent.
-            if (!/^\s*@claude\b/.test(body)) {
-              core.info('No @claude command at start of comment; skipping.');
+            // "@claude" can appear anywhere in the comment body (mention style).
+            if (!/@claude\b/.test(body)) {
+              core.info('No @claude mention in comment; skipping.');
               return;
             }
 
