@@ -6,8 +6,10 @@ const COUNT_KEY = 'app_count'
 
 class AppState {
   count: number
+  services: Services
 
-  constructor(private services: Services) {
+  constructor(services: Services) {
+    this.services = services
     this.count = services.persistence.get<number>(COUNT_KEY) ?? 0
   }
 

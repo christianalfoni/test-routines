@@ -107,6 +107,7 @@ class AppState {
 export const appState = reactive(new AppState(browserServices))
 ```
 
+- **`erasableSyntaxOnly` is enabled** in this project — TypeScript constructor parameter properties (`private services: Services`) are forbidden. Declare the property explicitly and assign in the constructor body instead.
 - Services are **infrastructure verbs** (`get/set/post/subscribe`) — no domain logic.
 - Domain operations (e.g. `signIn`, `increment`) live in the state class and call services internally.
 - Swap in in-memory implementations for tests — no mocking needed.
