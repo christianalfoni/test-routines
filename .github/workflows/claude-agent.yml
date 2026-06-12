@@ -1,6 +1,6 @@
 name: Claude Agent Dispatcher
 
-# Kicks off a cloud Claude Code routine when a writer comments "/claude ..." on an ISSUE.
+# Kicks off a cloud Claude Code routine when a writer comments "@claude ..." on an ISSUE.
 # This workflow does ZERO Claude work: it gates, sanitises, fires the routine, and acks.
 # The PR lifecycle that follows (CI failures, review comments) is owned by the routine's
 # Auto-fix behaviour — this dispatcher does NOT listen for PR events.
@@ -22,7 +22,7 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.type != 'Bot' &&
-      contains(github.event.comment.body, '/claude') &&
+      contains(github.event.comment.body, '@claude') &&
       (github.event.comment.author_association == 'OWNER' ||
        github.event.comment.author_association == 'MEMBER' ||
        github.event.comment.author_association == 'COLLABORATOR')
@@ -43,10 +43,9 @@ jobs:
             const commentUrl = comment.html_url;
             const body = comment.body || '';
 
-            // Treat "/claude" as a COMMAND at the start of the comment, not a substring.
-            // A quoted or summarised "/claude" mid-text must not fire the agent.
-            if (!/^\s*\/claude\b/.test(body)) {
-              core.info('No /claude command at start of comment; skipping.');
+            // "@claude" can appear anywhere in the comment body (mention style).
+            if (!/@claude\b/.test(body)) {
+              core.info('No @claude mention in comment; skipping.');
               return;
             }
 
