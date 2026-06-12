@@ -6,12 +6,12 @@ an issue-comment event to the routine.
 ## Why it exists
 
 Routines have native GitHub triggers for `pull_request` and `release` **only** — never
-issue comments. Kicking work off from a `/claude` issue comment is the one thing Auto-fix
+issue comments. Kicking work off from an `@claude` issue comment is the one thing Auto-fix
 can't do, so this dispatcher exists solely for that. Once the routine opens a PR, Auto-fix
 owns the PR lifecycle (CI failures + review comments) automatically — the dispatcher does
 NOT listen for any PR/CI events.
 
-Flow: `/claude ...` on an issue → dispatcher (gate, sanitise, fire, ack) → routine (clone,
+Flow: `@claude ...` on an issue → dispatcher (gate, sanitise, fire, ack) → routine (clone,
 implement, open PR) → Auto-fix takes over the PR.
 
 ## What the workflow does (single `actions/github-script@v7` step)
@@ -19,9 +19,9 @@ implement, open PR) → Auto-fix takes over the PR.
 - **Event:** `issue_comment: [created]` only. Job-level `if` drops PR comments
   (`github.event.issue.pull_request == null`) and Bot comments (`...user.type != 'Bot'` —
   stops the dispatcher's own `github-actions[bot]` ack from re-triggering it).
-- **Command match:** coarse `contains(body, '/claude')` in the `if:` as a cheap pre-filter,
-  then the authoritative `/^\s*\/claude\b/` test in the step — so a quoted/summarised
-  `/claude` mid-text can't fire it.
+- **Command match:** coarse `contains(body, '@claude')` in the `if:` as a cheap pre-filter,
+  then the authoritative `/^\s*@claude\b/` test in the step — so a quoted/summarised
+  `@claude` mid-text can't fire it.
 - **Write gate (fails closed):** `author_association` ∈ {OWNER, MEMBER, COLLABORATOR}, in
   the job `if:`. There is deliberately **no `always()` step** — every post-gate action sits
   on default `success()`, so a short-circuited gate can never fire the routine.
