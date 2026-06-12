@@ -75,8 +75,8 @@ node --check /tmp/s.js
 ```
 The async wrapper matters — github-script runs the body in an async fn, so top-level
 `await` is valid there but `node --check` rejects it unwrapped. This only proves YAML+JS
-syntax; true end-to-end validation needs the secrets, the routine, and a real issue comment
-(can't be done locally).
+syntax; true end-to-end validation needs the secrets, the routine, and a real GitHub event
+(issue comment or issue open) — can't be done locally.
 
 ## Routine behaviour (what the routine prompt must say)
 
