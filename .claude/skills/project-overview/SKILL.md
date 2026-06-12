@@ -20,6 +20,7 @@ A web app scaffolded with **Vite + React + TypeScript** (Vite's `react-ts` templ
 - `index.html` — Vite HTML entry
 - `vite.config.ts`, `tsconfig*.json` (`tsconfig.app.json` for app code, `tsconfig.node.json` for config files)
 - `public/` — served as-is
+- `.github/workflows/claude-agent.yml` — "/claude" issue-comment dispatcher (see the `claude-agent-docs` skill)
 
 ## Commands
 - `npm run dev` — dev server (HMR)
