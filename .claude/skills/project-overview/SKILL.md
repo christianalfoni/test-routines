@@ -24,6 +24,7 @@ A web app scaffolded with **Vite + React + TypeScript** (Vite's `react-ts` templ
 - `vite.config.ts`, `tsconfig*.json` (`tsconfig.app.json` for app code, `tsconfig.node.json` for config files)
 - `public/` — served as-is
 - `.github/workflows/claude-agent.yml` — "@claude" issue-comment dispatcher (see the `claude-agent-docs` skill)
+- `.claude/hooks/session-start.sh` — runs `npm install` automatically on remote sessions (CLAUDE_CODE_REMOTE=true only)
 
 ## Commands
 - `npm run dev` — dev server (HMR)
