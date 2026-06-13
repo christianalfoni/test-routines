@@ -22,17 +22,19 @@ implement, open PR) → Auto-fix takes over the PR.
     comments (`...user.type != 'Bot'` — stops the dispatcher's own `github-actions[bot]`
     ack from re-triggering it).
   - `issues: [opened]` — fires when `@claude` appears in the original issue body. Uses
-    `github.event.issue.author_association` for the write gate (no bot-type check needed —
-    bots won't hold OWNER/MEMBER/COLLABORATOR). The dedupe marker is keyed to
+    `github.event.issue.user.login == 'christianalfoni'` for the write gate (no bot-type
+    check needed — bots won't match the login). The dedupe marker is keyed to
     `issue-<number>` (not a numeric comment id) so it never collides.
 - **Command match:** coarse `contains(body, '@claude')` in the job-level `if:` as a cheap
   pre-filter, then the authoritative `/@claude\b/` test in the step — `@claude` can appear
   anywhere in the body (mention style, not a slash-command).
 - **Context label:** the fire payload uses `Comment URL:` for `issue_comment` events and
   `Issue URL:` for `issues` events; both point to the triggering URL.
-- **Write gate (fails closed):** `author_association` ∈ {OWNER, MEMBER, COLLABORATOR}, in
-  the job `if:`. There is deliberately **no `always()` step** — every post-gate action sits
-  on default `success()`, so a short-circuited gate can never fire the routine.
+- **Write gate (fails closed):** `user.login == 'christianalfoni'` for both event types
+  (previously `author_association` ∈ {OWNER, MEMBER, COLLABORATOR} — tightened in #13/PR#14).
+  The bot-type guard on `issue_comment` is kept so the dispatcher's own ack can't re-trigger.
+  There is deliberately **no `always()` step** — every post-gate action sits on default
+  `success()`, so a short-circuited gate can never fire the routine.
 - **Dedupe:** before firing, list the issue's comments and skip if one already carries the
   hidden marker `<!-- claude-dispatch:<comment_id> -->`. The success ack carries that
   marker. This is the only guard against the no-idempotency-key retry burning a daily run.
