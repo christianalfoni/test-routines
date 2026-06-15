@@ -50,15 +50,12 @@ node .claude/skills/drive-app/drive.mjs \
   -- assert .counter "Count is 0"
 ```
 
-**Test the Reset button resets the counter to 0:**
-Buttons without a class can be targeted with Playwright's text selector (`text=Label`).
+**Verify the counter increments correctly (no reset button):**
 ```bash
 node .claude/skills/drive-app/drive.mjs \
   navigate http://localhost:5173 \
   -- clear-storage \
   -- click .counter \
   -- click .counter \
-  -- assert .counter "Count is 2" \
-  -- click "text=Reset" \
-  -- assert .counter "Count is 0"
+  -- assert .counter "Count is 2"
 ```
