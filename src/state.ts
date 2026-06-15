@@ -17,11 +17,6 @@ class AppState {
     this.count++
     this.services.persistence.set(COUNT_KEY, this.count)
   }
-
-  reset() {
-    this.count = 0
-    this.services.persistence.set(COUNT_KEY, this.count)
-  }
 }
 
 export const appState = reactive(new AppState(browserServices))
