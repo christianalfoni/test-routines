@@ -26,12 +26,6 @@ function App() {
         >
           Count is {appState.count}
         </button>
-        <button
-          type="button"
-          onClick={() => appState.reset()}
-        >
-          Reset
-        </button>
       </section>
 
       <div className="ticks"></div>
